@@ -1,0 +1,59 @@
+from selenium import webdriver
+from selenium.webdriver.common.by import By
+import time
+import pandas as pd
+from selenium.webdriver.common.keys import Keys
+import selenium.webdriver.support.ui as ui
+from selenium.webdriver.common.action_chains import ActionChains  ##引入ActionChains鼠标操作类
+
+def get_comments_from_weibo():
+    driver=webdriver.Firefox()   #调用Firefox浏览器
+    #driver.set_headless()    #无页面显示操作，为了方便观察程序运行状态，这个可以不加
+    driver.get('https://m.weibo.cn/')   #访问微博页面
+    time.sleep(2)   #设置一个休息时间，模拟人类正常的访问操作，也给页面留出足够的加载时间，下同
+    driver.find_element(By.CLASS_NAME,'m-search').click()    #点击搜索栏
+    time.sleep(2)
+    driver.find_element(By.XPATH,'/html/body/div/div[1]/div[1]/div[1]/div/div/div[2]/form/input').send_keys('#嘉兴南湖#')  #在输入框中输入#嘉兴南湖#
+    time.sleep(1)
+    driver.find_element(By.XPATH,'/html/body/div/div[1]/div[1]/div[1]/div/div/div[2]/form/input').send_keys(Keys.ENTER)  #模仿回车键输入
+    time.sleep(3)
+    driver.find_element(By.XPATH,'/html/body/div[1]/div[1]/div[1]/div[3]/div[2]/div[1]/div/div/div/ul/li[2]/span').click()     #点击实时按钮
+    time.sleep(3)
+    before_turning_number=0
+    global weibo_df
+    weibo_df=pd.DataFrame(columns=['headers','date','phone','content','zhuanfa','pinglun','dianzan'])  #设置一个用户存储获取内容的df
+    after_turning_number=len(driver.find_elements(By.CLASS_NAME,'weibo-text')) 
+    row_number=0
+    error_number=0   #设置初始错误次数为0
+    ##翻页到底程序段##
+    while after_turning_number>before_turning_number:
+          before_turning_number=after_turning_number
+          driver.execute_script("window.scrollTo(0,document.body.scrollHeight);")   #执行下滑滑轮到底端操作
+          time.sleep(3)  #执行翻页后的等待时间可以结合自身的网络情况适当延长
+          after_turning_number=len(driver.find_elements(By.CLASS_NAME,'weibo-text'))
+    else:
+        print('翻页结束')
+        time.sleep(3)
+    ##抽取用户信息、用户评论内容程序段##
+    for i in range(4,1000000):
+        if error_number<5:  #当错误次数小于5时，执行获取微博内容的命令
+            try:
+                headers=driver.find_elements(By.XPATH,'/html/body/div[1]/div[1]/div[1]/div['+str(i)+']/div/div/div/header/div/div/a/h3')[0].text
+                date=driver.find_elements(By.XPATH,'/html/body/div[1]/div[1]/div[1]/div['+str(i)+']/div/div/div/header/div/div/h4/span[1]')[0].text
+                phone=driver.find_elements(By.XPATH,'/html/body/div[1]/div[1]/div[1]/div['+str(i)+']/div/div/div/header/div/div/h4/span[2]')[0].text
+                content=driver.find_elements(By.XPATH,'/html/body/div[1]/div[1]/div[1]/div['+str(i)+']/div/div/div/article/div[2]/div[1]')[0].text
+                zhuanfa=driver.find_elements(By.XPATH,'/html/body/div[1]/div[1]/div[1]/div['+str(i)+']/div/div/div/footer/div[1]')[0].text
+                pinglun=driver.find_elements(By.XPATH,'/html/body/div[1]/div[1]/div[1]/div['+str(i)+']/div/div/div/footer/div[2]')[0].text
+                dianzan=driver.find_elements(By.XPATH,'/html/body/div[1]/div[1]/div[1]/div['+str(i)+']/div/div/div/footer/div[3]')[0].text
+                weibo_df.loc[row_number]=[headers,date,phone,content,zhuanfa,pinglun,dianzan]
+                row_number=row_number+1
+            except:
+                error_number=error_number+1  #错误次数加1
+                continue  #继续执行循环
+        else:
+            break
+
+get_comments_from_weibo()
+
+# 将数据表df写入test.xlsx文件中'Sheet1'页
+weibo_df.to_excel('D:\隐形加班\#嘉兴南湖#.xlsx',sheet_name='Sheet1')
